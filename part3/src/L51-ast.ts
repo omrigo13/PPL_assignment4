@@ -5,7 +5,7 @@
 // L51 extends L5 with:
 // typed class construct
 
-import { concat, chain, join, map, zipWith } from "ramda";
+import { concat, chain, join, map, zipWith, filter, reduce } from "ramda";
 import { Sexp, Token } from 's-expression';
 import { isCompoundSExp, isEmptySExp, isSymbolSExp, makeCompoundSExp, makeEmptySExp, makeSymbolSExp, SExpValue, valueToString } from '../imp/L5-value';
 import { allT, first, rest, second, isEmpty } from '../shared/list';
@@ -277,6 +277,11 @@ const parseProcExp = (vars: Sexp, rest: Sexp[]): Result<ProcExp> => {
         return makeFailure(`Invalid args ${JSON.stringify(vars)}`)
     }
 }
+const isGoodTypeName = (typeName: Sexp): typeName is string =>
+    !isArray(typeName) && isIdentifier(typeName)
+
+const isGoodFields = (fields: Sexp): fields is Sexp[] =>
+    isArray(fields) && allT(isIdentifier, fields)
 
 const isGoodBindings = (bindings: Sexp): bindings is [Sexp, Sexp][] =>
     isArray(bindings) && allT(isArray, bindings);
@@ -335,8 +340,18 @@ const parseClassExp = (params: Sexp[]): Result<ClassExp> =>
     (params.length != 4) || (params[0] != ':') ? makeFailure(`class must have shape (class [: <type>]? <fields> <methods>) - got ${params.length} params instead`) :
     parseGoodClassExp(params[1], params[2], params[3]);
 
-const parseGoodClassExp = (typeName: Sexp, varDecls: Sexp, bindings: Sexp): Result<ClassExp> =>
-    makeFailure("TODO parseGoodClassExp");
+const parseGoodClassExp = (typeName: Sexp, varDecls: Sexp, bindings: Sexp): Result<ClassExp> => {
+    if(!isGoodTypeName(typeName))
+        return makeFailure(`Invalid type name for ClassExp`);
+    const type_name = makeTVar(typeName);
+    if(!isGoodFields(varDecls))
+        return makeFailure(`Invalid fields for ClassExp`);
+    const fields = mapResult(parseVarDecl, varDecls)
+    if(!isGoodBindings(bindings))
+        return makeFailure(`Invalid methods for ClassExp`);
+    const class_bindings = parseBindings(bindings);
+    return bind(class_bindings, (methods) => bind(fields, (vars) => makeOk(makeClassExp(type_name, vars, methods))));
+}
 
 // sexps has the shape (quote <sexp>)
 export const parseLitExp = (param: Sexp): Result<LitExp> =>
@@ -448,9 +463,14 @@ const unparseClassExp = (ce: ClassExp, unparseWithTVars?: boolean): Result<strin
 // L51: Collect named types in AST
 // Collect class expressions in parsed AST so that they can be passed to the type inference module
 
-export const parsedToClassExps = (p: Parsed): ClassExp[] => 
-    // TODO parsedToClassExps
-    [];
+export const parsedToClassExps = (p: Parsed): ClassExp[] => {
+    if(isArray(p) && isProgram(p)) {
+        const cleaned : Parsed [] = filter(isDefineExp, p); //only define exp
+        return reduce((acc, elem) => concat(acc, parsedToClassExps(elem)), [makeClassExp(makeTVar("will be dropped"), [], [])], cleaned).slice(1);
+    }
+    else if (isDefineExp(p) && isClassExp(p.val)) return [p.val];
+    else return [];
+}
 
 // L51 
 export const classExpToClassTExp = (ce: ClassExp): ClassTExp => 
