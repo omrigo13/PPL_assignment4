@@ -56,7 +56,7 @@ export function lazyFilter<T>(genFn: () => Generator<T>, filterFn: (param:T)=>bo
 
 export function lazyMap<T, R>(genFn: () => Generator<T>, mapFn: (param:T)=>R): ()=> Generator<R> {
     function* generator() {
-        for (let val of genFn()){
+        for (let val of genFn()) {
             yield mapFn(val);
         }
     }
@@ -69,3 +69,21 @@ export function lazyMap<T, R>(genFn: () => Generator<T>, mapFn: (param:T)=>R): (
 // export async function asyncWaterfallWithRetry(fns: [() => Promise<any>, ...(???)[]]): Promise<any> {
 //     ???
 // }
+
+export async function asyncWaterfallWithRetry(fns: [() => Promise<any>, ...{ (elem: any): Promise<any> }[]]): Promise<any> {
+    let curr_func: Promise<any> = fns[0]()
+    const rest_funcs: { (elem: any): Promise<any> }[] = fns.slice(1)
+    for (let i = 0; i < rest_funcs.length; i++) {
+        const curr: any = await curr_func
+        curr_func = rest_funcs[i](curr).catch(() => {
+            setTimeout(() => null, 2000)
+            return rest_funcs[i](curr).catch(() => {
+                setTimeout(() => null, 2000)
+                return rest_funcs[i](curr).catch((err) => {
+                    throw err
+                })
+            })
+        })
+    }
+    return await curr_func
+}
