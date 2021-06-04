@@ -103,7 +103,10 @@ const checkNoOccurrence = (tvar: T.TVar, te: T.TExp, exp: A.Exp): Result<true> =
 // For each class (class : typename ...) add a pair <class.typename classTExp> to TEnv
 export const makeTEnvFromClasses = (parsed: A.Parsed): E.TEnv => {
     // TODO makeTEnvFromClasses
-    return E.makeEmptyTEnv();
+    const classes : A.ClassExp[] = A.parsedToClassExps(parsed);
+    const names: string[] = classes.map((cls) => cls.typeName.var);
+    const classes_texps = classes.map((cls) => cls.typeName);
+    return E.makeExtendTEnv(names, classes_texps, E.makeEmptyTEnv());
 }
 
 // Purpose: Compute the type of a concrete expression
@@ -240,7 +243,10 @@ export const typeofLetrec = (exp: A.LetrecExp, tenv: E.TEnv): Result<T.TExp> => 
 //   (define (var : texp) val)
 // TODO - write the typing rule for define-exp
 export const typeofDefine = (exp: A.DefineExp, tenv: E.TEnv): Result<T.VoidTExp> => {
-    return makeFailure('TODO typeofDefine');
+    // return makeFailure('TODO typeofDefine');
+    const var_name: string = exp.var.var;
+    const define_type_result = bind(typeofExp(exp.val, E.makeExtendTEnv([var_name], [exp.var.texp], tenv)), (val_type: T.TExp) => checkEqualType(exp.var.texp, val_type, exp));
+    return bind(define_type_result, () => makeOk(T.makeVoidTExp()));
 };
 
 // Purpose: compute the type of a program
@@ -251,23 +257,36 @@ export const typeofProgram = (exp: A.Program, tenv: E.TEnv): Result<T.TExp> =>
     isEmpty(exp.exps) ? makeFailure("Empty program") :
     typeofProgramExps(first(exp.exps), rest(exp.exps), tenv);
 
-const typeofProgramExps = (exp: A.Exp, exps: A.Exp[], tenv: E.TEnv): Result<T.TExp> => 
-    makeFailure('TODO typeofProgramExps');
+const typeofProgramExps = (exp: A.Exp, exps: A.Exp[], tenv: E.TEnv): Result<T.TExp> =>  {
+    // makeFailure('TODO typeofProgramExps');
+    return isEmpty(exps) ? typeofExp(exp, tenv) :
+    bind(typeofExp(exp, tenv), () => A.isDefineExp(exp) ? typeofProgramExps(first(exps), rest(exps), E.makeExtendTEnv([exp.var.var], [exp.var.texp], tenv)) :
+    typeofProgramExps(first(exps), rest(exps), tenv));
+}
 
 
 // Purpose: compute the type of a literal expression
 //      - Only need to cover the case of Symbol and Pair
 //      - for a symbol - record the value of the symbol in the SymbolTExp
 //        so that precise type checking can be made on ground symbol values.
-export const typeofLit = (exp: A.LitExp): Result<T.TExp> =>
-    makeFailure(`TODO typeofLit`);
+export const typeofLit = (exp: A.LitExp): Result<T.TExp> => {
+    // makeFailure(`TODO typeofLit`);
+    if (V.isSymbolSExp(exp.val))
+        return makeOk(T.makeSymbolTExp(exp.val));
+    else if(V.isCompoundSExp(exp.val))
+        return makeOk(T.makePairTExp());
+    return makeFailure(`illigal symbol or pair LitExp`);
+}
 
 // Purpose: compute the type of a set! expression
 // Typing rule:
 //   (set! var val)
 // TODO - write the typing rule for set-exp
 export const typeofSet = (exp: A.SetExp, tenv: E.TEnv): Result<T.VoidTExp> => {
-    return makeFailure('TODO typeofSet');
+    // return makeFailure('TODO typeofSet');
+    const var_texp = E.applyTEnv(tenv, exp.var.var);
+    const set_type_result = bind(var_texp, (var_type) => bind(typeofExp(exp.val, tenv), (typeOfVal: T.TExp) => checkEqualType(var_type, typeOfVal, exp)));
+    return bind(set_type_result, () => makeOk(T.makeVoidTExp()));
 };
 
 // Purpose: compute the type of a class-exp(type fields methods)
@@ -278,5 +297,11 @@ export const typeofSet = (exp: A.SetExp, tenv: E.TEnv): Result<T.VoidTExp> => {
 //      type<method_k>(class-tenv) = mk
 // Then type<class(type fields methods)>(tend) = = [t1 * ... * tn -> type]
 export const typeofClass = (exp: A.ClassExp, tenv: E.TEnv): Result<T.TExp> => {
-    return makeFailure("TODO typeofClass");
+    // return makeFailure("TODO typeofClass");
+    const fields_type = exp.fields.map((field : A.VarDecl) => field.texp);
+    const ext_env = E.makeExtendTEnv(exp.fields.map((field : A.VarDecl) => field.var), fields_type, tenv);
+    const methods = mapResult((binding : A.Binding) => typeofExp(binding.val, ext_env), exp.methods);
+    const exp_methods = exp.methods.map((binding : A.Binding) => binding.var.texp);
+    const class_type_result = bind(methods, (texp_arr : T.TExp[]) => checkEqualTypes(texp_arr, exp_methods, exp))
+    return bind(class_type_result, () => makeOk(T.makeProcTExp(fields_type, A.classExpToClassTExp(exp))));
 };

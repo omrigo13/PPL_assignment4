@@ -12,6 +12,7 @@ import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeV
 import { isEmpty, allT, first, rest } from '../shared/list';
 import { Result, makeFailure, bind, makeOk, safe3, safe2, zipWithResult } from '../shared/result';
 import { parse as p } from "../shared/parser";
+import * as ti from "./L51-typeinference";
 
 // Purpose: Check that type expressions are equivalent
 // as part of a fully-annotated type check process of exp.
@@ -95,6 +96,9 @@ export const typeofPrim = (p: PrimOp): Result<TExp> =>
     (p.op === 'string=?') ? parseTE('(T1 * T2 -> boolean)') :
     (p.op === 'display') ? parseTE('(T -> void)') :
     (p.op === 'newline') ? parseTE('(Empty -> void)') :
+    (p.op === 'car') ? parseTE('(cons -> T)') :
+    (p.op === 'cdr') ? parseTE('(cons -> T)') :
+    (p.op === 'cons') ? parseTE('(T1 * T2 -> cons)') :
     makeFailure(`Primitive not yet implemented: ${p.op}`);
 
 // Purpose: compute the type of an if-exp
@@ -199,11 +203,12 @@ export const typeofLetrec = (exp: LetrecExp, tenv: TEnv): Result<TExp> => {
 //   (define (var : texp) val)
 // Not implemented
 export const typeofDefine = (exp: DefineExp, tenv: TEnv): Result<VoidTExp> => {
-    return makeOk(makeVoidTExp());
+    return ti.typeofDefine(exp,tenv);
 };
 
 // Purpose: compute the type of a program
 // Typing rule:
 // Not implemented: Thread the TEnv (as in L1)
 export const typeofProgram = (exp: Program, tenv: TEnv): Result<TExp> =>
-    makeFailure("Not implemented");
+    // makeFailure("Not implemented");
+    ti.typeofProgram(exp,tenv);

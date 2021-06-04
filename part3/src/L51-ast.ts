@@ -465,8 +465,8 @@ const unparseClassExp = (ce: ClassExp, unparseWithTVars?: boolean): Result<strin
 
 export const parsedToClassExps = (p: Parsed): ClassExp[] => {
     if(isArray(p) && isProgram(p)) {
-        const cleaned : Parsed [] = filter(isDefineExp, p); //only define exp
-        return reduce((acc, elem) => concat(acc, parsedToClassExps(elem)), [makeClassExp(makeTVar("will be dropped"), [], [])], cleaned).slice(1);
+        const define_exps : Parsed[] = filter(isDefineExp, p);
+        return reduce((acc, elem) => concat(acc, parsedToClassExps(elem)), [makeClassExp(makeTVar("sliced and removed exp"), [], [])], define_exps).slice(1);
     }
     else if (isDefineExp(p) && isClassExp(p.val)) return [p.val];
     else return [];
