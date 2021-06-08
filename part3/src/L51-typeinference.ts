@@ -242,6 +242,13 @@ export const typeofLetrec = (exp: A.LetrecExp, tenv: E.TEnv): Result<T.TExp> => 
 // Typing rule:
 //   (define (var : texp) val)
 // TODO - write the typing rule for define-exp
+// Typing rule define:
+// For every: type environment _Tenv,
+// variable _x1
+// expressions _e1 and
+// type expressions _S1, _U1:
+// If _Tenv |- _x1 : _S1 , _e1 : _U1 , _S1 = _U1
+// Then _Tenv |- (define _x1 _e1) : void
 export const typeofDefine = (exp: A.DefineExp, tenv: E.TEnv): Result<T.VoidTExp> => {
     // return makeFailure('TODO typeofDefine');
     const var_name: string = exp.var.var;
@@ -282,6 +289,13 @@ export const typeofLit = (exp: A.LitExp): Result<T.TExp> => {
 // Typing rule:
 //   (set! var val)
 // TODO - write the typing rule for set-exp
+// Typing rule set:
+// For every: type environment _Tenv,
+// variable _x1
+// expressions _e1 and
+// type expressions _S1:
+// If _Tenv |- _x1 : _S1 , _e1 : _S1
+// Then _Tenv |- (set! _x1 _e1) : void
 export const typeofSet = (exp: A.SetExp, tenv: E.TEnv): Result<T.VoidTExp> => {
     // return makeFailure('TODO typeofSet');
     const var_texp = E.applyTEnv(tenv, exp.var.var);
